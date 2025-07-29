@@ -33,7 +33,6 @@ const UserTable = () => {
         try {
             setLoading(true);
 
-
             const res = await axios.get(`${import.meta.env.VITE_API_URL}?page=${pageNo}`);
             const newData = res.data.data;
             setData(newData);
@@ -84,6 +83,7 @@ const UserTable = () => {
 
         const selected = allData.slice(0, total);
         setSelectedRows(selected);
+        op.current?.hide();
     }
 
     return (
