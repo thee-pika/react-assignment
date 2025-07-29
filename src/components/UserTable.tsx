@@ -22,9 +22,8 @@ const UserTable = () => {
     const [data, setData] = useState<Data[]>([]);
     const [totalPages, setTotalPages] = useState(0);
     const [loading, setLoading] = useState(false);
-    const [rowClick, setRowClick] = useState(false);
+    const [rowClick,] = useState(false);
     const [selectedRows, setSelectedRows] = useState<Data[]>([]);
-    const [openDialog, setOpenDialog] = useState(false);
     const [rowsSelected, setRowsSelected] = useState(0);
     const [allData, setAllData] = useState<Data[]>([]);
 
@@ -67,7 +66,6 @@ const UserTable = () => {
         return <div>Loading...</div>
     }
 
-    console.log("openDialog", openDialog);
 
     const handleSubmit = async () => {
         let total = rowsSelected;
