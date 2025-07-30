@@ -10,6 +10,7 @@ import { InputText } from 'primereact/inputtext';
 import { OverlayPanel } from 'primereact/overlaypanel';
 
 interface Data {
+    id: number;
     title: string;
     place_of_origin: string;
     artist_display: string;
@@ -17,17 +18,19 @@ interface Data {
     date_start: string;
     date_end: string;
 }
+
+const PAGE_SIZE = 12;
+
 const UserTable = () => {
     const [pageNo, setPageNo] = useState(1);
     const [data, setData] = useState<Data[]>([]);
-    const [totalPages, setTotalPages] = useState(0);
+    const [totalRecords, setTotalRecords] = useState(0);
     const [loading, setLoading] = useState(false);
-    const [rowClick,] = useState(false);
-    const [selectedRows, setSelectedRows] = useState<Data[]>([]);
     const [rowsSelected, setRowsSelected] = useState(0);
-    const [allData, setAllData] = useState<Data[]>([]);
+    const [selectedRowsMap, setSelectedRowsMap] = useState<Map<number, Data>>(new Map());
 
     const op = useRef<OverlayPanel>(null);
+
     const fetchData = async () => {
         try {
             setLoading(true);
@@ -35,21 +38,13 @@ const UserTable = () => {
             const res = await axios.get(`${import.meta.env.VITE_API_URL}?page=${pageNo}`);
             const newData = res.data.data;
             setData(newData);
-            setTotalPages(res.data.pagination.total);
-            console.log("totalPages", totalPages);
-
-            setAllData(prev => {
-                const unique = [...prev, ...newData].filter((value, index, self) =>
-                    index === self.findIndex(v => v.title === value.title)
-                );
-                return unique;
-            });
+            setTotalRecords(res.data.pagination.total);
 
         } catch (error) {
             console.log("error", error);
         } finally {
             setLoading(false);
-            console.log("finally");
+
         }
     }
 
@@ -58,64 +53,94 @@ const UserTable = () => {
     }, [pageNo]);
 
     const onPageChange = (event: any) => {
-        console.log("event", event);
         setPageNo(event.page + 1);
     }
 
-    if (loading) {
-        return <div>Loading...</div>
-    }
-
-
     const handleSubmit = async () => {
-        let total = rowsSelected;
+        const total = rowsSelected;
+        const tempMap = new Map<number, Data>();
+        let page = 1;
+        let fetched = 0;
 
-        let currentPage = pageNo;
-        while (allData.length < total && currentPage * 12 < totalPages) {
-            currentPage++;
-            const res = await axios.get(`${import.meta.env.VITE_API_URL}?page=${currentPage}`);
-            const newData = res.data.data;
-            setAllData(prev => [...prev, ...newData]);
+        while (fetched < total) {
+            const res = await axios.get(`${import.meta.env.VITE_API_URL}?page=${page}`);
+            const pageData: Data[] = res.data.data;
+
+            for (let i = 0; i < pageData.length && fetched < total; i++) {
+                const row = pageData[i];
+                tempMap.set(row.id, row);
+                fetched++;
+            }
+
+            if (pageData.length === 0) break; 
+            page++;
         }
 
-
-        const selected = allData.slice(0, total);
-        setSelectedRows(selected);
+        setSelectedRowsMap(tempMap);
         op.current?.hide();
+    };
+
+    const onSelectionChange = (e: any) => {
+        const updatedMap = new Map(selectedRowsMap);
+
+        data.forEach((row) => {
+            if (e.value.some((selected: Data) => selected.id === row.id)) {
+                updatedMap.set(row.id, row);
+            } else {
+                updatedMap.delete(row.id);
+            }
+        })
+        setSelectedRowsMap(updatedMap);
     }
+
+    const getCurrentPageSelections = () =>
+        data.filter((row) => selectedRowsMap.has(row.id));
 
     return (
         <>
-            <DataTable value={data} selectionMode={rowClick ? null : "checkbox"} selection={selectedRows}
-                onSelectionChange={(e: any) => setSelectedRows(e.value)} tableStyle={{ minWidth: '50rem' }}>
-                <Column selectionMode="multiple" headerStyle={{ width: '3rem' }}></Column>
+            <DataTable
+                value={data}
+                loading={loading}
+                selection={getCurrentPageSelections()}
+                onSelectionChange={onSelectionChange}
+                selectionMode="checkbox"
+                dataKey="id"
+                tableStyle={{ minWidth: "50rem" }}
+            >
+                <Column selectionMode="multiple" headerStyle={{ width: "3rem" }} />
                 <Column
                     field="title"
                     header={
-                        <div className="card flex justify-content-center ">
-                            <ChevronDown size={16} onClick={(e) => op?.current?.toggle(e)} /> Title
+                        <div className="flex items-center gap-2">
+                            <ChevronDown size={16} onClick={(e) => op.current?.toggle(e)} />
+                            <span>Title</span>
                             <OverlayPanel ref={op}>
-                                <div>
-                                    <InputText keyfilter="int" placeholder="Select Rows" onChange={(e) => setRowsSelected(parseInt(e.target.value))} />
-                                    <br />
-                                    <br />
+                                <div className="flex flex-col gap-2 p-2">
+                                    <InputText
+                                        keyfilter="int"
+                                        placeholder="Select Rows"
+                                        onChange={(e) => setRowsSelected(parseInt(e.target.value))}
+                                    />
                                     <Button label="Submit" onClick={handleSubmit} />
                                 </div>
                             </OverlayPanel>
                         </div>
                     }
                 />
-
                 <Column field="place_of_origin" header="Place of Origin" />
                 <Column field="artist_display" header="Artist Display" />
                 <Column field="inscriptions" header="Inscriptions" />
                 <Column field="date_start" header="Date Start" />
                 <Column field="date_end" header="Date End" />
-
             </DataTable>
 
-
-            <Paginator first={(pageNo - 1) * 12} rows={12} totalRecords={totalPages} rowsPerPageOptions={[12]} onPageChange={onPageChange} />
+            <Paginator
+                first={(pageNo - 1) * PAGE_SIZE}
+                rows={PAGE_SIZE}
+                totalRecords={totalRecords}
+                rowsPerPageOptions={[PAGE_SIZE]}
+                onPageChange={onPageChange}
+            />
         </>
     )
 }
